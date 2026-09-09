@@ -272,10 +272,10 @@ launchctl load ~/Library/LaunchAgents/com.github.agent-dispatcher.plist
 | `AUTO_CREATE_PR` | `false` | After a successful issue job, open a PR from the agent branch. |
 | `POLL_INTERVAL_SECONDS` | `300` | Poll cadence (min sensible ~60; `doctor` warns below 10). |
 | `VALIDATION_COMMANDS` | *empty* | Comma/newline-separated commands to run before commit/push. **Your list only — never from GitHub input.** |
-| `DATABASE_PATH` | `~/.github-agent-dispatcher/state.db` | SQLite job store. |
+| `DATABASE_PATH` | `.state/state.db` | SQLite job store (in the project, gitignored). |
 | `MAX_CONCURRENT_JOBS` | `2` | Worker threads. Per-repo locking prevents concurrent edits to the same checkout. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
-| `GAD_DATA_DIR` | `~/.github-agent-dispatcher` | Data directory. |
+| `GAD_DATA_DIR` | `.state/` in project root | Data directory (gitignored): holds `state.db`, `locks/`, and `config.json` by default. |
 | `GAD_CONFIG_FILE` | `$GAD_DATA_DIR/config.json` | Optional per-repo JSON overrides. |
 | `GAD_ENV_FILE` | `.env` in repo root | Path to the environment file. |
 | `GITHUB_API_URL` / `GITHUB_WEB_URL` | github.com | Change `GITHUB_API_URL` for GitHub Enterprise. |

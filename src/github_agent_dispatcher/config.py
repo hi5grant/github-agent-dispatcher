@@ -58,7 +58,8 @@ def _split_command(value: str) -> list[str]:
 
 
 def default_data_dir() -> Path:
-    return Path.home() / ".github-agent-dispatcher"
+    project_root = Path(__file__).resolve().parents[2]
+    return project_root / ".state"
 
 
 @dataclass
