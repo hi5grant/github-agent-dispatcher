@@ -28,6 +28,7 @@ def clean_env(monkeypatch):
         "GITHUB_ALLOW_SELF",
     ]:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GAD_ENV_FILE", "/nonexistent/not-a-real-env-file")
 
 
 def test_defaults(clean_env, monkeypatch, tmp_path):

@@ -18,7 +18,7 @@ class ConfigError(Exception):
 
 def _env(key: str, default: str = "") -> str:
     value = os.environ.get(key)
-    return default if value is None else value.strip()
+    return default if value is None or not value.strip() else value.strip()
 
 
 def _env_bool(key: str, default: bool) -> bool:

@@ -33,6 +33,10 @@ def test_build_prompt_contains_context_and_rules(tmp_path: Path):
     assert "@agent please fix" in prompt
     assert "Do not commit and do not push" in prompt
     assert "Inspect the repository" in prompt
+    assert "https://api.github.com/repos/owner/repo1/issues/7/comments" in prompt
+    assert "🤖" in prompt
+    assert "PASS" in prompt
+    assert "FAIL" in prompt
 
 
 def test_opencode_invokes_subprocess_success(tmp_path: Path, monkeypatch):

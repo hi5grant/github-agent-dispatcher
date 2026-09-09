@@ -11,7 +11,23 @@ feedback that mentions `@agent` (or matches other rules you configure) — it:
 2. Checks out the repository into a local workspace.
 3. Invokes OpenCode non-interactively to do the work.
 4. Runs **your** validation commands before anything is committed or pushed.
-5. Commits and pushes the result, and posts a result comment back on GitHub.
+5. Commits and pushes the result, and posts status comments back on GitHub.
+
+### What the agent does
+
+When the coding agent picks up a `@agent` request, it is instructed to keep the
+requester informed on the originating issue or PR by posting comments through
+GitHub's REST API (the dispatcher passes the comment endpoint and `GITHUB_TOKEN`
+is available in the agent's environment), in this order:
+
+1. **Acknowledge receipt** — a short `🤖` acknowledgment
+   (e.g. `🤖 Acknowledged, investigating now.`) posted immediately on receipt.
+2. **Analysis** — what the current code does, the root cause or required change,
+   and the plan to address it.
+3. **Implement** — make the fix in the working directory (no comment at this step).
+4. **Results** — a final comment reporting whether the change was applied and
+   passed validation, saying **PASS** or **FAIL** explicitly, with failure
+   details if applicable. This comment is posted regardless of the outcome.
 
 If the machine is off when work arrives, nothing is lost — polling resumes on
 the next run. You stay in control: nothing runs unless it matches your rules,
