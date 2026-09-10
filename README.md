@@ -78,8 +78,8 @@ Modules under `src/github_agent_dispatcher/`:
 - `agents/opencode.py` — summons OpenCode via subprocess.
 - `git/repository.py`, `git/lock.py` — git operations and cross-platform
   per-repository locking (no `fcntl`, works on Windows via atomic lock files).
-- `workspace/manager.py` — safe workspace paths (`owner--repo` slugs, no
-  path traversal).
+- `workspace/manager.py` — safe workspace paths (nested `owner/repo`
+  directories under `WORKSPACE_ROOT`, no path traversal).
 - `github/` — thin GitHub REST client (pagination, rate-limit handling with
   `Retry-After`, transient retry).
 - `cli.py` / `service.py` — command line interface and the polling loop.
@@ -370,8 +370,9 @@ agent-listener show <job-id>
   the scanner, not just at the UI.
 - Commands run on your machine come only from `VALIDATION_COMMANDS` /
   per-repo overrides — GitHub text is **never** executed.
-- Workspace paths are slugged (`owner--repo`) and traversal-checked; jobs are
-  per-repo locked so concurrent workers can't edit one checkout at once.
+- Workspace paths are the nested `owner/repo` layout under `WORKSPACE_ROOT`
+  and traversal-checked; jobs are per-repo locked so concurrent workers can't
+  edit one checkout at once.
 - The agent is prompted to leave git operations (commit/push) to the
   dispatcher; the dispatcher commits with an explicit `agent:` author, and
   never force-pushes, resets, or cleans the workspace.

@@ -162,7 +162,7 @@ def test_agent_with_no_changes_fails(worker_env):
 
 def test_dirty_workspace_blocks(worker_env, tmp_path):
     env = worker_env
-    ws = Path(env["config"].workspace_root) / "owner--repo1"
+    ws = Path(env["config"].workspace_root) / "owner" / "repo1"
     ws.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "clone", env["origin"], str(ws)], check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=ws, check=True, capture_output=True)
