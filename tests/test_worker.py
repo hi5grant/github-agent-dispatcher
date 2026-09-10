@@ -12,6 +12,7 @@ from github_agent_dispatcher.agents.base import AgentResult
 from github_agent_dispatcher.jobs.models import Job, JobStatus, new_job_id
 from github_agent_dispatcher.jobs.queue import JobQueue
 from github_agent_dispatcher.jobs.worker import JobWorker
+from github_agent_dispatcher.reconciliation import parse_resolution_markers
 from github_agent_dispatcher.storage.database import Database
 from tests.fixtures import FakeGitHub, NoopAgent, WritingAgent, pull_request, repo_info
 
@@ -320,3 +321,44 @@ def test_validation_commands_never_from_github_input(worker_env):
     make_worker(env, WritingAgent()).try_process(job)
     done = env["db"].get_job(job.id)
     assert done.status == JobStatus.FAILED  # validation failed; nothing executed from text
+
+
+# ------------------------------------------------------- resolution markers
+def test_success_feedback_body_carries_resolution_marker(worker_env):
+    env = worker_env
+    job = make_job(
+        type="issue_comment",
+        comment_id=123456,
+        status=JobStatus.SUCCEEDED,
+        commit_sha="abc123",
+    )
+    worker = make_worker(env, WritingAgent())
+    body = worker._feedback_body(job)
+    assert "Resolves comment 123456" in body
+    assert ("issue_comment", "owner/repo1", "comment:123456") in parse_resolution_markers(body)
+
+
+def test_failure_feedback_body_carries_resolution_marker(worker_env):
+    env = worker_env
+    job = make_job(type="issue", issue_number=7, status=JobStatus.FAILED, result="FAILED", error="boom")
+    worker = make_worker(env, WritingAgent())
+    body = worker._feedback_body(job)
+    assert "Resolves issue #7" in body
+    assert ("issue", "owner/repo1", "issue:#7") in parse_resolution_markers(body)
+
+
+def test_feedback_posts_marker_comment(worker_env):
+    env = worker_env
+    job = make_job(
+        type="issue",
+        issue_number=5,
+        status=JobStatus.SUCCEEDED,
+        commit_sha="abc123",
+    )
+    worker = make_worker(env, WritingAgent())
+    worker.post_feedback(job)
+    assert env["github"].posted
+    repo, number, body = env["github"].posted[-1]
+    assert repo == "owner/repo1"
+    assert number == 5
+    assert ("issue", "owner/repo1", "issue:#5") in parse_resolution_markers(body)

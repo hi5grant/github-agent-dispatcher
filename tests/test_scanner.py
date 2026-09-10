@@ -237,6 +237,115 @@ def test_dispatcher_comments_do_not_loop(config, fake_github):
     db.close()
 
 
+# --------------------------------------------------------- fresh-db reconcile
+def test_fresh_db_reconciles_resolved_issue_comment(config, fake_github):
+    # A brand-new SQLite re-scans everything; a resolution marker on the thread
+    # must prevent the item from being re-enqueued and record it as processed.
+    fake_github.repos = [repo()]
+    fake_github.issues = [issue()]
+    fake_github.issue_comments = [
+        comment(100, number=1, body="@agent fix the problem"),
+        comment(
+            101,
+            number=1,
+            body=(
+                "Resolves comment 100 (github-agent-dispatcher job aaabbb)\n"
+                "<!-- gad-resolved topic=issue_comment repo=owner/repo1 item=comment:100 job=aaabbb -->"
+            ),
+        ),
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 0
+    assert db.is_processed("issue_comment", "owner/repo1", "comment:100")
+    db.close()
+
+
+def test_fresh_db_reconciles_resolved_issue(config, fake_github):
+    fake_github.repos = [repo()]
+    fake_github.issues = [issue(body="@agent implement the fix")]
+    fake_github.issue_comments = [
+        comment(
+            1,
+            number=1,
+            body="<!-- gad-resolved topic=issue repo=owner/repo1 item=issue:#1 job=aaaa -->",
+        )
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 0
+    assert db.is_processed("issue", "owner/repo1", "issue:#1")
+    db.close()
+
+
+def test_fresh_db_reconciles_resolved_pull_comment(config, fake_github):
+    fake_github.repos = [repo()]
+    fake_github.prs = [pr()]
+    fake_github.issue_comments = [
+        comment(300, number=1, body="@agent address this review comment"),
+        comment(
+            301,
+            number=1,
+            body="<!-- gad-resolved topic=pull_comment repo=owner/repo1 item=comment:300 job=bbbb -->",
+        ),
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 0
+    assert db.is_processed("pull_comment", "owner/repo1", "comment:300")
+    db.close()
+
+
+def test_fresh_db_reconciles_resolved_review_comment(config, fake_github):
+    fake_github.repos = [repo()]
+    fake_github.prs = [pr()]
+    fake_github.review_comments = [review(400)]
+    fake_github.issue_comments = [
+        comment(
+            301,
+            number=1,
+            body="Resolves comment 400 (github-agent-dispatcher job cccc)\n"
+            "<!-- gad-resolved topic=review_comment repo=owner/repo1 item=comment:400 job=cccc -->",
+        )
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 0
+    assert db.is_processed("review_comment", "owner/repo1", "comment:400")
+    db.close()
+
+
+def test_fresh_db_marker_for_other_comment_still_discovers(config, fake_github):
+    fake_github.repos = [repo()]
+    fake_github.issues = [issue()]
+    fake_github.issue_comments = [
+        comment(100, number=1, body="@agent fix the problem"),
+        comment(
+            102,
+            number=1,
+            body="<!-- gad-resolved topic=issue_comment repo=owner/repo1 item=comment:999 job=aaaa -->",
+        ),
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 1
+    jobs = db.list_jobs()
+    assert jobs[0].type == JobType.ISSUE_COMMENT
+    assert jobs[0].comment_id == 100
+    db.close()
+
+
+def test_fresh_db_marker_for_other_repo_does_not_suppress(config, fake_github):
+    fake_github.repos = [repo()]
+    fake_github.issues = [issue()]
+    fake_github.issue_comments = [
+        comment(100, number=1, body="@agent fix the problem"),
+        comment(
+            102,
+            number=1,
+            body="<!-- gad-resolved topic=issue_comment repo=other/repo item=comment:100 job=aaaa -->",
+        ),
+    ]
+    scanner, db, queue = make_scanner(config, fake_github)
+    assert scanner.scan()["discovered"] == 1
+    db.close()
+
+
 # ------------------------------------------------------------------ prs
 def test_pr_comment_discovered_with_branch(config, fake_github):
     fake_github.repos = [repo()]

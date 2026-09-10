@@ -9,6 +9,7 @@ from github_agent_dispatcher.github.issues import issue_trigger_candidates, pr_t
 from github_agent_dispatcher.github.repositories import resolve_repositories
 from github_agent_dispatcher.jobs.models import Job, JobStatus, JobType, new_job_id
 from github_agent_dispatcher.jobs.queue import JobQueue
+from github_agent_dispatcher.reconciliation import parse_resolution_markers
 from github_agent_dispatcher.security.authorization import Authorization, contains_trigger
 
 logger = logging.getLogger(__name__)
@@ -58,17 +59,38 @@ class Scanner:
     def _scan_repo(self, repo: str) -> int:
         total = 0
         for issue, comments in issue_trigger_candidates(self.client, repo):
-            if self._maybe_issue_job(issue):
+            resolved = self._thread_resolved(repo, comments)
+            if self._maybe_issue_job(issue, resolved):
                 total += 1
-            total += self._scan_comments(issue, comments)
+            total += self._scan_comments(issue, comments, resolved)
         for pr, comments, reviews in pr_trigger_candidates(self.client, repo):
-            total += self._scan_pr(repo, pr, comments, reviews)
+            resolved = self._thread_resolved(repo, [*comments, *reviews])
+            total += self._scan_pr(repo, pr, comments, reviews, resolved)
         return total
 
+    # -------------------------------------------------------------- reconcile
+    def _thread_resolved(self, repo: str, thread_comments: list) -> set[tuple[str, str]]:
+        """Collect ``(topic, item_id)`` items this thread marks as already handled."""
+        resolved: set[tuple[str, str]] = set()
+        for comment in thread_comments:
+            for topic, marker_repo, item_id in parse_resolution_markers(comment.body or ""):
+                if marker_repo == repo:
+                    resolved.add((topic, item_id))
+        return resolved
+
+    def _reconcile(self, topic: str, repo: str, item_id: str) -> None:
+        """Record a Github-sourced resolution in local SQLite so a fresh database
+        does not re-enqueue the item on the next scan."""
+        self.queue.mark_processed(topic, repo, item_id)
+        logger.info("[scan] reconciled from GitHub marker topic=%s repo=%s item=%s", topic, repo, item_id)
+
     # ----------------------------------------------------------------- issues
-    def _maybe_issue_job(self, issue: Issue) -> bool:
+    def _maybe_issue_job(self, issue: Issue, resolved: set[tuple[str, str]]) -> bool:
         repo = f"{issue.owner}/{issue.name}"
         item_id = f"issue:#{issue.number}"
+        if ("issue", item_id) in resolved:
+            self._reconcile("issue", repo, item_id)
+            return False
         if self.queue.is_processed("issue", repo, item_id):
             return False
         if not self._issue_matches_mode(issue):
@@ -120,15 +142,18 @@ class Scanner:
         return False
 
     # ------------------------------------------------------------- comments
-    def _scan_comments(self, issue: Issue, comments: list) -> int:
+    def _scan_comments(self, issue: Issue, comments: list, resolved: set[tuple[str, str]]) -> int:
         repo = f"{issue.owner}/{issue.name}"
         total = 0
         for comment in comments:
+            item_id = f"comment:{comment.id}"
+            if ("issue_comment", item_id) in resolved:
+                self._reconcile("issue_comment", repo, item_id)
+                continue
             if not contains_trigger(comment.body, self.config.trigger):
                 continue
             if not self.auth.user_allowed(comment.user):
                 continue
-            item_id = f"comment:{comment.id}"
             if self.queue.is_processed("issue_comment", repo, item_id):
                 continue
             job = Job(
@@ -160,16 +185,26 @@ class Scanner:
         return total
 
     # -------------------------------------------------------------------- pr
-    def _scan_pr(self, repo: str, pr: PullRequest, comments: list, reviews: list) -> int:
+    def _scan_pr(
+        self,
+        repo: str,
+        pr: PullRequest,
+        comments: list,
+        reviews: list,
+        resolved: set[tuple[str, str]],
+    ) -> int:
         total = 0
         if pr.state != "open":
             return total
         for comment in comments:
+            item_id = f"comment:{comment.id}"
+            if ("pull_comment", item_id) in resolved:
+                self._reconcile("pull_comment", repo, item_id)
+                continue
             if not contains_trigger(comment.body, self.config.trigger):
                 continue
             if not self.auth.user_allowed(comment.user):
                 continue
-            item_id = f"comment:{comment.id}"
             if self.queue.is_processed("pull_comment", repo, item_id):
                 continue
             job = Job(
@@ -201,11 +236,14 @@ class Scanner:
             total += 1
 
         for review in reviews:
+            item_id = f"comment:{review.id}"
+            if ("review_comment", item_id) in resolved:
+                self._reconcile("review_comment", repo, item_id)
+                continue
             if not contains_trigger(review.body, self.config.trigger):
                 continue
             if not self.auth.user_allowed(review.user):
                 continue
-            item_id = f"comment:{review.id}"
             if self.queue.is_processed("review_comment", repo, item_id):
                 continue
             job = Job(
