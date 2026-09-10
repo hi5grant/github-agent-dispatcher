@@ -10,6 +10,7 @@ from github_agent_dispatcher.git.repository import GitError, Repository
 from github_agent_dispatcher.github.client import GitHubAPIError, GitHubClient
 from github_agent_dispatcher.jobs.models import AgentOutcome, Job, JobStatus
 from github_agent_dispatcher.jobs.queue import JobQueue
+from github_agent_dispatcher.reconciliation import marker_lines
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +294,8 @@ class JobWorker:
             logger.warning("[github] could not post feedback for %s: %s", job.id, exc)
 
     def _feedback_body(self, job: Job) -> str:
+        human, marker = marker_lines(job)
+        footer = f"\n\n{human}\n{marker}"
         if job.status == JobStatus.SUCCEEDED:
             lines = [
                 "🤖 Agent completed this request.",
@@ -304,22 +307,23 @@ class JobWorker:
             ]
             if job.pr_url:
                 lines.append(f"- Pull request: {job.pr_url}")
-            return "\n".join(lines)
+            return "\n".join(lines) + footer
         if job.result == AgentOutcome.VALIDATION_FAILED:
             return (
                 "🤖 Agent attempted this request but validation failed.\n\n"
                 "No changes were pushed.\n\n"
-                f"Failure details:\n```\n{job.error or 'unknown'}\n```"
+                f"Failure details:\n```\n{job.error or 'unknown'}\n```" + footer
             )
         if job.status == JobStatus.BLOCKED:
             return (
                 "🤖 Agent could not start this request because the local repository "
                 "contains pre-existing uncommitted changes.\n\n"
-                f"Reason: {job.error or 'workspace not clean'}"
+                f"Reason: {job.error or 'workspace not clean'}" + footer
             )
         if job.status == JobStatus.FAILED:
             return (
                 f"🤖 Agent attempted this request but failed.\n\nError:\n```\n{job.error or 'unknown'}\n```"
+                + footer
             )
         return ""
 

@@ -376,6 +376,11 @@ agent-listener show <job-id>
 - The agent is prompted to leave git operations (commit/push) to the
   dispatcher; the dispatcher commits with an explicit `agent:` author, and
   never force-pushes, resets, or cleans the workspace.
+- Every terminal feedback comment carries a resolution marker
+  (`Resolves comment <id> ...` plus a `gad-resolved` tag naming the triggering
+  comment/issue and job). The scanner reads these markers as GitHub's
+  source of truth and writes them into its SQLite, so a fresh database
+  reconciling against GitHub will never re-enqueue an already-resolved item.
 
 ---
 
