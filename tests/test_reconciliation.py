@@ -31,9 +31,7 @@ def test_marker_lines_for_comment_job():
     human, tag = marker_lines(job())
     assert human == "Resolves comment 123456 (github-agent-dispatcher job aaabbb)"
     assert "gad-resolved" in tag
-    assert parse_resolution_markers(f"{human}\n{tag}") == {
-        ("issue_comment", "owner/repo1", "comment:123456")
-    }
+    assert parse_resolution_markers(f"{human}\n{tag}") == {("issue_comment", "owner/repo1", "comment:123456")}
 
 
 def test_marker_lines_for_issue_job():
@@ -48,10 +46,7 @@ def test_parse_ignores_unrelated_text():
 
 
 def test_parse_extracts_multiple_markers():
-    body = (
-        f"{resolution_marker(job(comment_id=1))}\n"
-        f"{resolution_marker(job(comment_id=2))}"
-    )
+    body = f"{resolution_marker(job(comment_id=1))}\n{resolution_marker(job(comment_id=2))}"
     assert parse_resolution_markers(body) == {
         ("issue_comment", "owner/repo1", "comment:1"),
         ("issue_comment", "owner/repo1", "comment:2"),
