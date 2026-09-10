@@ -7,9 +7,7 @@ from github_agent_dispatcher.jobs.models import Job
 #: Machine-readable tag embedded in every resolution comment we post.
 RESOLVED_TAG = "gad-resolved"
 
-_RESOLVED_RE = re.compile(
-    r"gad-resolved\s+topic=(\S+)\s+repo=(\S+)\s+item=(\S+)\s+job=(\S+)"
-)
+_RESOLVED_RE = re.compile(r"gad-resolved\s+topic=(\S+)\s+repo=(\S+)\s+item=(\S+)\s+job=(\S+)")
 
 
 def resolved_phrase(job: Job) -> str:
@@ -21,10 +19,7 @@ def resolved_phrase(job: Job) -> str:
 
 def resolution_marker(job: Job) -> str:
     """Coded identifier so a fresh database can reconcile from GitHub."""
-    return (
-        f"<!-- {RESOLVED_TAG} topic={job.dedup_topic} repo={job.repo} "
-        f"item={job.dedup_id} job={job.id} -->"
-    )
+    return f"<!-- {RESOLVED_TAG} topic={job.dedup_topic} repo={job.repo} item={job.dedup_id} job={job.id} -->"
 
 
 def marker_lines(job: Job) -> tuple[str, str]:
